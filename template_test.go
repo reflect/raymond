@@ -27,7 +27,7 @@ CONTENT[ '
 func TestNewTemplate(t *testing.T) {
 	t.Parallel()
 
-	tpl := newTemplate(sourceBasic)
+	tpl := newTemplate(sourceBasic, TemplateOptions{})
 	if tpl.source != sourceBasic {
 		t.Errorf("Failed to instantiate template")
 	}
@@ -163,4 +163,25 @@ func ExampleTemplate_PrintAST() {
 	//  }}
 	//   CONTENT[ '</p>' ]
 	//
+}
+
+func ExampleTemplate_ExecWithOptions() {
+	source := "<h1>{{title}}</h1><p>{{body.content}}</p>"
+
+	ctx := map[string]interface{}{
+		"title": "foo",
+		"body":  map[string]string{"content": "<div>bar</div>"},
+	}
+
+	// parse template
+	tpl := MustParseWithOptions(source, TemplateOptions{NoEscape: true})
+
+	// evaluate template with context
+	output, err := tpl.Exec(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Print(output)
+	// Output: <h1>foo</h1><p><div>bar</div></p>
 }

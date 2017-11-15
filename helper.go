@@ -17,6 +17,13 @@ type Options struct {
 	hash   map[string]interface{}
 }
 
+// FnOptions are options that can be passed down in a block helper.
+type FnOptions struct {
+	Context     interface{}
+	Data        *DataFrame
+	BlockParams []interface{}
+}
+
 // helpers stores all globally registered helpers
 var helpers = make(map[string]reflect.Value)
 
@@ -198,11 +205,11 @@ func (options *Options) newIterDataFrame(length int, i int, key interface{}) *Da
 //
 
 // evalBlock evaluates block with given context, private data and iteration key
-func (options *Options) evalBlock(ctx interface{}, data *DataFrame, key interface{}) string {
+func (options *Options) evalBlock(opts FnOptions) string {
 	result := ""
 
 	if block := options.eval.curBlock(); (block != nil) && (block.Program != nil) {
-		result = options.eval.evalProgram(block.Program, ctx, data, key)
+		result = options.eval.evalProgram(block.Program, opts.Context, opts.Data, opts.BlockParams)
 	}
 
 	return result
@@ -210,22 +217,27 @@ func (options *Options) evalBlock(ctx interface{}, data *DataFrame, key interfac
 
 // Fn evaluates block with current evaluation context.
 func (options *Options) Fn() string {
-	return options.evalBlock(nil, nil, nil)
+	return options.evalBlock(FnOptions{})
 }
 
 // FnCtxData evaluates block with given context and private data frame.
 func (options *Options) FnCtxData(ctx interface{}, data *DataFrame) string {
-	return options.evalBlock(ctx, data, nil)
+	return options.evalBlock(FnOptions{Context: ctx, Data: data})
 }
 
 // FnWith evaluates block with given context.
 func (options *Options) FnWith(ctx interface{}) string {
-	return options.evalBlock(ctx, nil, nil)
+	return options.evalBlock(FnOptions{Context: ctx})
 }
 
 // FnData evaluates block with given private data frame.
 func (options *Options) FnData(data *DataFrame) string {
-	return options.evalBlock(nil, data, nil)
+	return options.evalBlock(FnOptions{Data: data})
+}
+
+// FnOpts evaluates the block with the given options.
+func (options *Options) FnOpts(opts FnOptions) string {
+	return options.evalBlock(opts)
 }
 
 // Inverse evaluates "else block".
@@ -320,7 +332,11 @@ func eachHelper(context interface{}, options *Options) interface{} {
 			data := options.newIterDataFrame(val.Len(), i, nil)
 
 			// evaluates block
-			result += options.evalBlock(val.Index(i).Interface(), data, i)
+			result += options.evalBlock(FnOptions{
+				Context:     val.Index(i).Interface(),
+				Data:        data,
+				BlockParams: []interface{}{i},
+			})
 		}
 	case reflect.Map:
 		// note: a go hash is not ordered, so result may vary, this behaviour differs from the JS implementation
@@ -333,7 +349,11 @@ func eachHelper(context interface{}, options *Options) interface{} {
 			data := options.newIterDataFrame(len(keys), i, key)
 
 			// evaluates block
-			result += options.evalBlock(ctx, data, key)
+			result += options.evalBlock(FnOptions{
+				Context:     ctx,
+				Data:        data,
+				BlockParams: []interface{}{key},
+			})
 		}
 	case reflect.Struct:
 		var exportedFields []int
@@ -353,7 +373,11 @@ func eachHelper(context interface{}, options *Options) interface{} {
 			data := options.newIterDataFrame(len(exportedFields), i, key)
 
 			// evaluates block
-			result += options.evalBlock(ctx, data, key)
+			result += options.evalBlock(FnOptions{
+				Context:     ctx,
+				Data:        data,
+				BlockParams: []interface{}{key},
+			})
 		}
 	}
 

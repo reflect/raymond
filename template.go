@@ -7,13 +7,21 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/aymerick/raymond/ast"
-	"github.com/aymerick/raymond/parser"
+	"github.com/reflect/raymond/ast"
+	"github.com/reflect/raymond/parser"
 )
+
+// TemplateOptions are options that can be used to configure a specific
+// template's behavior.
+type TemplateOptions struct {
+	// True if content should not be HTML-escaped by default; false otherwise.
+	NoEscape bool
+}
 
 // Template represents a handlebars template.
 type Template struct {
 	source   string
+	opts     TemplateOptions
 	program  *ast.Program
 	helpers  map[string]reflect.Value
 	partials map[string]*partial
@@ -21,17 +29,18 @@ type Template struct {
 }
 
 // newTemplate instanciate a new template without parsing it
-func newTemplate(source string) *Template {
+func newTemplate(source string, opts TemplateOptions) *Template {
 	return &Template{
 		source:   source,
+		opts:     opts,
 		helpers:  make(map[string]reflect.Value),
 		partials: make(map[string]*partial),
 	}
 }
 
-// Parse instanciates a template by parsing given source.
-func Parse(source string) (*Template, error) {
-	tpl := newTemplate(source)
+// ParseWithOptions instantiates a template by parsing with the given options.
+func ParseWithOptions(source string, opts TemplateOptions) (*Template, error) {
+	tpl := newTemplate(source, opts)
 
 	// parse template
 	if err := tpl.parse(); err != nil {
@@ -41,23 +50,40 @@ func Parse(source string) (*Template, error) {
 	return tpl, nil
 }
 
-// MustParse instanciates a template by parsing given source. It panics on error.
-func MustParse(source string) *Template {
-	result, err := Parse(source)
+// Parse instanciates a template by parsing given source.
+func Parse(source string) (*Template, error) {
+	return ParseWithOptions(source, TemplateOptions{})
+}
+
+// MustParseWithOptions instantiates a template by parsing with the given
+// options. It panics on error.
+func MustParseWithOptions(source string, opts TemplateOptions) *Template {
+	result, err := ParseWithOptions(source, opts)
 	if err != nil {
 		panic(err)
 	}
 	return result
 }
 
-// ParseFile reads given file and returns parsed template.
-func ParseFile(filePath string) (*Template, error) {
+// MustParse instanciates a template by parsing given source. It panics on error.
+func MustParse(source string) *Template {
+	return MustParseWithOptions(source, TemplateOptions{})
+}
+
+// ParseFileWithOptions reads the given file and parses it with the given
+// options.
+func ParseFileWithOptions(filePath string, opts TemplateOptions) (*Template, error) {
 	b, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
 
 	return Parse(string(b))
+}
+
+// ParseFile reads given file and returns parsed template.
+func ParseFile(filePath string) (*Template, error) {
+	return ParseFileWithOptions(filePath, TemplateOptions{})
 }
 
 // parse parses the template
@@ -78,7 +104,7 @@ func (tpl *Template) parse() error {
 
 // Clone returns a copy of that template.
 func (tpl *Template) Clone() *Template {
-	result := newTemplate(tpl.source)
+	result := newTemplate(tpl.source, tpl.opts)
 
 	result.program = tpl.program
 

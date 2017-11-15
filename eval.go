@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aymerick/raymond/ast"
+	"github.com/reflect/raymond/ast"
 )
 
 var (
@@ -234,7 +234,7 @@ func (v *evalVisitor) errorf(format string, args ...interface{}) {
 //
 
 // evalProgram eEvaluates program with given context and returns string result
-func (v *evalVisitor) evalProgram(program *ast.Program, ctx interface{}, data *DataFrame, key interface{}) string {
+func (v *evalVisitor) evalProgram(program *ast.Program, ctx interface{}, data *DataFrame, additionalParams []interface{}) string {
 	blockParams := make(map[string]interface{})
 
 	// compute block params
@@ -242,8 +242,8 @@ func (v *evalVisitor) evalProgram(program *ast.Program, ctx interface{}, data *D
 		blockParams[program.BlockParams[0]] = ctx
 	}
 
-	if (len(program.BlockParams) > 1) && (key != nil) {
-		blockParams[program.BlockParams[1]] = key
+	for i := 1; i < len(program.BlockParams) && i-1 < len(additionalParams); i++ {
+		blockParams[program.BlockParams[i]] = additionalParams[i-1]
 	}
 
 	// push contexts
@@ -802,7 +802,7 @@ func (v *evalVisitor) VisitMustache(node *ast.MustacheStatement) interface{} {
 
 	// get string value
 	str := Str(expr)
-	if !isSafe && !node.Unescaped {
+	if !v.tpl.opts.NoEscape && !isSafe && !node.Unescaped {
 		// escape html
 		str = Escape(str)
 	}
@@ -840,7 +840,7 @@ func (v *evalVisitor) VisitBlock(node *ast.BlockStatement) interface{} {
 						frame := v.dataFrame.newIterDataFrame(val.Len(), i, nil)
 
 						// Evaluate program
-						concat += v.evalProgram(node.Program, val.Index(i).Interface(), frame, i)
+						concat += v.evalProgram(node.Program, val.Index(i).Interface(), frame, []interface{}{i})
 					}
 
 					result = concat
